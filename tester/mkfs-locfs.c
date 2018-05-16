@@ -17,6 +17,7 @@ static const uint64_t LOCFS_ROOTDIR_DATA_BLOCK_NO_OFFSET = 0;
 
 int main(int argc, char *argv[]) {
     int fd;
+    ssize_t ret;
     uint64_t welcome_inode_no;
     uint64_t welcome_data_block_no_offset;
 
@@ -26,7 +27,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // Create the locfs_super_block
+    // construct superblock
     struct locfs_super_block locfs_sb = {
         .version = 1,
         .magic = LOCFS_MAGIC,
@@ -37,31 +38,15 @@ int main(int argc, char *argv[]) {
         .data_block_count = 2,
     };
 
-    // write super block
-    if (sizeof(locfs_sb) != write(fd, &locfs_sb, sizeof(locfs_sb))) {
-        return -1;
-    }
-
     // construct inode bitmap
     char inode_bitmap[locfs_sb.blocksize];
     memset(inode_bitmap, 0, sizeof(inode_bitmap));
     inode_bitmap[0] = 1;
 
-    // write inode bitmap
-    if (sizeof(inode_bitmap) != write(fd, inode_bitmap, sizeof(inode_bitmap))) {
-        return -1;
-    }
-
     // construct data block bitmap
     char data_block_bitmap[locfs_sb.blocksize];
     memset(data_block_bitmap, 0, sizeof(data_block_bitmap));
     data_block_bitmap[0] = 1;
-
-    // write data block bitmap
-    if (sizeof(data_block_bitmap) != 
-            write(fd, data_block_bitmap, sizeof(data_block_bitmap))) {
-        return -1;
-    }
 
     // construct root inode
     struct locfs_inode root_locfs_inode = {
@@ -73,6 +58,38 @@ int main(int argc, char *argv[]) {
         .dir_children_count = 1,
     };
 
+    // construct root inode data block
+    struct locfs_dir_record root_dir_records[] = {
+        {
+            .filename = ".root",
+            // Start at 1 for the root inode
+            .inode_no = LOCFS_ROOTDIR_INODE_NO + 1,
+        },
+    };
+
+    // write super block
+    if (sizeof(locfs_sb)
+            != write(fd, &locfs_sb, sizeof(locfs_sb))) {
+        return -1;
+    }
+    if ((off_t)-1
+            == lseek(fd, locfs_sb.blocksize, SEEK_SET)) {
+        return -1;
+    }
+
+    // write inode bitmap
+    if (sizeof(inode_bitmap)
+            != write(fd, inode_bitmap, sizeof(inode_bitmap))) {
+        return -1;
+    }
+
+    // write data block bitmap
+    if (sizeof(data_block_bitmap)
+            != write(fd, data_block_bitmap,
+                     sizeof(data_block_bitmap))) {
+        return -1;
+    }
+
     // write root inode
     if (sizeof(root_locfs_inode)
             != write(fd, &root_locfs_inode,
@@ -80,6 +97,21 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
+    // write root inode data block
+    if ((off_t)-1
+            == lseek(
+                fd,
+                LOCFS_DATA_BLOCK_TABLE_START_BLOCK_NO_HSB(&locfs_sb)
+                    * locfs_sb.blocksize,
+                SEEK_SET)) {
+        return -1;
+    }
+    if (sizeof(root_dir_records)
+            != write(fd, root_dir_records,
+                     sizeof(root_dir_records))) {
+        return -1;
+    }
+
     close(fd);
-    return 0;
+    return ret;
 }
