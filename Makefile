@@ -6,7 +6,7 @@
 #obj-$(CONFIG_LOCFS) += locfs.o
 
 obj-m := locfs.o
-locfs-objs := main.o super.o inode.o file.o
+locfs-objs := main.o super.o inode.o file.o locationmod.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules

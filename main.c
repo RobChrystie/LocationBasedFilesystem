@@ -54,9 +54,19 @@ static int __init locfs_init(void)
     if (likely(err == 0)) {
         printk(KERN_INFO "Sucessfully registered locfs\n");
     } else {
+        printk(KERN_ERR "Failed to register locfs. Error:[%d]\n", err);
+    }
+
+    err = create_locationmod_proc();
+    if (likely(err == 0)) {
+        printk(KERN_INFO "Sucessfully created locationmod proc file\n");
+    } else {
+        printk(KERN_ERR "Failed to create locationmod proc file\n");
+    }
+
+    if (unlikely(err != 0)) {        
         // Cleanup SLAB on error
         kmem_cache_destroy(locfs_inode_cache);
-        printk(KERN_ERR "Failed to register locfs. Error:[%d]\n", err);
     }
     
     return err;
@@ -74,6 +84,8 @@ static void __exit locfs_exit(void)
     } else {
         printk(KERN_ERR "Failed to unregister locfs. Error:[%d]\n", err);
     }
+
+    remove_locationmod_proc();
 }
 
 MODULE_LICENSE("GPL");

@@ -17,9 +17,7 @@ static const uint64_t LOCFS_ROOTDIR_DATA_BLOCK_NO_OFFSET = 0;
 
 int main(int argc, char *argv[]) {
     int fd;
-    ssize_t ret;
-    uint64_t welcome_inode_no;
-    uint64_t welcome_data_block_no_offset;
+    ssize_t ret;   
 
     fd = open(argv[1], O_RDWR);
     if (fd == -1) {
@@ -56,13 +54,13 @@ int main(int argc, char *argv[]) {
             = LOCFS_DATA_BLOCK_TABLE_START_BLOCK_NO_HSB(&locfs_sb)
                 + LOCFS_ROOTDIR_DATA_BLOCK_NO_OFFSET,
         .dir_children_count = 1,
+        .location = "Home",
     };
 
     // construct root inode data block
     struct locfs_dir_record root_dir_records[] = {
         {
-            .filename = ".root",
-            // Start at 1 for the root inode
+            .filename = "root",
             .inode_no = LOCFS_ROOTDIR_INODE_NO + 1,
         },
     };

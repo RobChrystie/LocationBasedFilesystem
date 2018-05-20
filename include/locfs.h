@@ -14,17 +14,12 @@ struct locfs_dir_record {
     uint64_t inode_no;
 };
 
-struct gps_data {
-    /* TODO: Conert this to some sort real GPS data */
-    char location[LOCFS_LOCATION_MAXLEN];
-};
-
 struct locfs_inode {
     mode_t mode;
     uint64_t inode_no;
     uint64_t data_block_no;
 
-    struct gps_data li_gps_data;
+    char location[LOCFS_LOCATION_MAXLEN];
 
     union {
         uint64_t file_size;

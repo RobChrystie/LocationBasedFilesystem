@@ -36,6 +36,13 @@ void locfs_destroy_inode(struct inode *inode);
 int locfs_mkdir(struct inode *dir, struct dentry *dentry,
                    umode_t mode);
 
+/* locationmod.c */
+extern char *curr_location;
+
+int create_locationmod_proc(void);
+
+void remove_locationmod_proc(void);
+
 /* Helper functions */
 /* Used to get the locfs_super_block out of the super_block */
 static inline struct locfs_super_block *LOCFS_SB(struct super_block *sb) 

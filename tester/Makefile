@@ -1,5 +1,5 @@
 #
-# Makefile for the linux location based filesystem
+# Makefile for the locfs test apps
 #
 
 all: mkfs-locfs

@@ -6,7 +6,9 @@
 
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
+#include <linux/string.h>
 
+#include "include/locfs.h"
 #include "internal.h"
 
 DEFINE_MUTEX(locfs_sb_lock);
@@ -15,6 +17,8 @@ DEFINE_MUTEX(locfs_sb_lock);
 
 static const uint64_t LOCFS_INODE_BITMAP_BLOCK_NO = 1;
 static const uint64_t LOCFS_DATA_BLOCK_BITMAP_BLOCK_NO = 2;
+
+extern char *curr_location;
 
 /* Finds the starting block of the data blocks */
 static inline uint64_t LOCFS_DATA_BLOCK_TABLE_START_BLOCK_NO(struct super_block *sb) 
@@ -132,8 +136,7 @@ int locfs_alloc_data_block(struct super_block *sb, uint64_t *out_data_block_no) 
         slot = bitmap + i / BITS_IN_BYTE;
         needle = 1 << (i % BITS_IN_BYTE);
         if (0 == (*slot & needle)) {
-            *out_data_block_no
-                = LOCFS_DATA_BLOCK_TABLE_START_BLOCK_NO(sb) + i;
+            *out_data_block_no = LOCFS_DATA_BLOCK_TABLE_START_BLOCK_NO(sb) + i;
             *slot |= needle;
             locfs_sb->data_block_count += 1;
             ret = 0;
@@ -159,6 +162,8 @@ int locfs_create_inode(struct inode *dir, struct dentry *dentry,
     struct inode *inode;
     int ret;
 
+    printk(KERN_INFO "locfs: in locfs_create_inode");
+
     sb = dir->i_sb;
     locfs_sb = LOCFS_SB(sb);
 
@@ -183,6 +188,10 @@ int locfs_create_inode(struct inode *dir, struct dentry *dentry,
                "Inode %llu is neither a directory nor a regular file",
                inode_no);
     }
+
+    // Add the current location data
+    strcpy(locfs_inode->location, curr_location);
+    printk(KERN_INFO "Tagged file location %s", locfs_inode->location);
 
     /* Allocate data block for the new locfs_inode */
     ret = locfs_alloc_data_block(sb, &locfs_inode->data_block_no);
@@ -229,6 +238,8 @@ int locfs_mkdir(struct inode *dir,
                   struct dentry *dentry,
                   umode_t mode) 
 {
+    printk(KERN_INFO "locfs: in locfs_mkdir");
+
     // Set the mode explicitly to a directory
     mode |= S_IFDIR;
     return locfs_create_inode(dir, dentry, mode);
@@ -246,15 +257,18 @@ struct dentry *locfs_lookup(struct inode *dir,
     struct inode *child_inode;
     uint64_t i;
 
+    printk(KERN_INFO "locfs: in locfs_lookup");
+
     bh = sb_bread(sb, parent_locfs_inode->data_block_no);
     BUG_ON(!bh);
 
     dir_record = (struct locfs_dir_record *)bh->b_data;
 
     for (i = 0; i < parent_locfs_inode->dir_children_count; i++) {
-        printk(KERN_INFO "locfs_lookup: i=%llu, dir_record->filename=%s, child_dentry->d_name.name=%s", i, dir_record->filename, child_dentry->d_name.name);    // TODO
-        if (0 == strcmp(dir_record->filename, child_dentry->d_name.name)) {
+        printk(KERN_INFO "locfs_lookup: i=%llu, dir_record->filename=%s, child_dentry->d_name.name=%s", i, dir_record->filename, child_dentry->d_name.name);
+        if (strcmp(dir_record->filename, child_dentry->d_name.name) == 0) {
             locfs_child_inode = locfs_get_locfs_inode(sb, dir_record->inode_no);
+            printk(KERN_INFO "locfs: %s", locfs_child_inode->location);
             child_inode = new_inode(sb);
             if (!child_inode) {
                 printk(KERN_ERR "Cannot create new inode. No memory.\n");
@@ -288,7 +302,7 @@ static inline uint64_t LOCFS_INODE_BLOCK_OFFSET(struct super_block *sb, uint64_t
     return inode_no / LOCFS_INODES_PER_BLOCK_HSB(locfs_sb);
 }
 
-/* Called from locfs_dir_operations.iterate */
+/* Called from locfs_dir_operations.iterate , called from ls in user space */
 int locfs_iterate(struct file *filp, 
                     struct dir_context *ctx)
 {
@@ -296,47 +310,52 @@ int locfs_iterate(struct file *filp,
 	struct inode *inode;
 	struct super_block *sb;
 	struct buffer_head *bh;
-	struct locfs_inode *sfs_inode;
+	struct locfs_inode *lfs_inode;
 	struct locfs_dir_record *record;
 	int i;
+
+    printk(KERN_INFO "In locfs_iterate");
 
 	pos = ctx->pos;
 	inode = filp->f_inode;
 	sb = inode->i_sb;
 
 	if (pos) {
-		/* FIXME: We use a hack of reading pos to figure if we have filled in all data.
-		 * We should probably fix this to work in a cursor based model and
-		 * use the tokens correctly to not fill too many data in each cursor based call */
 		return 0;
 	}
 
-	sfs_inode = LOCFS_INODE(inode);
+	lfs_inode = LOCFS_INODE(inode);
 
-	if (unlikely(!S_ISDIR(sfs_inode->mode))) {
-		printk(KERN_ERR
-		       "inode [%llu][%lu] for fs object not a directory\n",
-		       sfs_inode->inode_no, inode->i_ino);
+    // Check to make sure this is a directory
+	if (unlikely(!S_ISDIR(lfs_inode->mode))) {
+		printk(KERN_ERR "inode [%llu][%lu] for fs object not a directory\n",
+		       lfs_inode->inode_no, inode->i_ino);
 		return -ENOTDIR;
 	}
 
-	bh = sb_bread(sb, sfs_inode->data_block_no);
+    // Read this inode
+	bh = sb_bread(sb, lfs_inode->data_block_no);
 	BUG_ON(!bh);
 
 	record = (struct locfs_dir_record *)bh->b_data;
-	for (i = 0; i < sfs_inode->dir_children_count; i++) {
-		dir_emit(ctx, record->filename, LOCFS_FILENAME_MAXLEN,
-			record->inode_no, DT_UNKNOWN);
-		ctx->pos += sizeof(struct locfs_dir_record);
-		pos += sizeof(struct locfs_dir_record);
-		record++;
+
+	for (i = 0; i < lfs_inode->dir_children_count; i++) {
+        // Compare to see if this file was saved at the current location   
+        printk(KERN_INFO "locfs: li_gps_data == %s", lfs_inode->location);
+        if (strcmp(lfs_inode->location, curr_location) == 0) {
+	        dir_emit(ctx, record->filename, LOCFS_FILENAME_MAXLEN, record->inode_no, DT_UNKNOWN);
+        	ctx->pos += sizeof(struct locfs_dir_record);
+        	pos += sizeof(struct locfs_dir_record);
+        	record++;
+        } else {
+            printk(KERN_INFO "File %s not in %s location", record->filename, curr_location);
+        }
 	}
 	brelse(bh);
 
 	return 0;
 }
 
-/* TODO What does this do? Is i_fop even used? */
 static const struct file_operations locfs_dir_operations = {
     .owner   = THIS_MODULE,
     .iterate = locfs_iterate,
