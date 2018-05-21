@@ -45,23 +45,23 @@ static int __init locfs_init(void)
                                            NULL);
 
     if (locfs_inode_cache == NULL) {
-        printk(KERN_ERR "Error creating locfs_inode_cache\n");
+        printk(KERN_ERR "locfs: Error creating locfs_inode_cache\n");
         return -ENOMEM;
     }
 
     err = register_filesystem(&locfs_type);
 
     if (likely(err == 0)) {
-        printk(KERN_INFO "Sucessfully registered locfs\n");
+        printk(KERN_INFO "locfs: Sucessfully registered\n");
     } else {
-        printk(KERN_ERR "Failed to register locfs. Error:[%d]\n", err);
+        printk(KERN_ERR "locfs: Failed to register, error %d\n", err);
     }
 
     err = create_locationmod_proc();
     if (likely(err == 0)) {
-        printk(KERN_INFO "Sucessfully created locationmod proc file\n");
+        printk(KERN_INFO "locfs: Sucessfully created locationmod proc file\n");
     } else {
-        printk(KERN_ERR "Failed to create locationmod proc file\n");
+        printk(KERN_ERR "locfs: Failed to create locationmod proc file\n");
     }
 
     if (unlikely(err != 0)) {        
@@ -80,9 +80,9 @@ static void __exit locfs_exit(void)
     kmem_cache_destroy(locfs_inode_cache);
 
     if (likely(err == 0)) {
-        printk(KERN_INFO "Sucessfully unregistered locfs\n");
+        printk(KERN_INFO "locfs: Sucessfully unregistered\n");
     } else {
-        printk(KERN_ERR "Failed to unregister locfs. Error:[%d]\n", err);
+        printk(KERN_ERR "locfs: Failed to unregister, error %d\n", err);
     }
 
     remove_locationmod_proc();

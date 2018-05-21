@@ -5,7 +5,6 @@
  */
 
 #include <linux/buffer_head.h>
-
 #include "internal.h"
 
 ssize_t locfs_read(struct file *filp, 

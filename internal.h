@@ -31,8 +31,6 @@ void locfs_fill_inode(struct super_block *sb,
                         struct inode *inode,
                         struct locfs_inode *locfs_inode);
 
-void locfs_destroy_inode(struct inode *inode);
-
 int locfs_mkdir(struct inode *dir, struct dentry *dentry,
                    umode_t mode);
 

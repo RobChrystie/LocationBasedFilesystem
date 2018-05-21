@@ -4,10 +4,9 @@
  * By, Robert Chrystie
  */
 
-#include <linux/blkdev.h>
+#include <linux/slab.h>
 #include <linux/buffer_head.h>
 #include <linux/string.h>
-
 #include "include/locfs.h"
 #include "internal.h"
 
@@ -363,15 +362,6 @@ static const struct file_operations locfs_dir_operations = {
     .owner   = THIS_MODULE,
     .iterate = locfs_iterate,
 };
-
-/* Used in super.c for the super_operations */
-void locfs_destroy_inode(struct inode *inode) {
-    struct locfs_inode *locfs_inode = LOCFS_INODE(inode);
-
-    printk(KERN_INFO "Freeing private data of inode %p (%lu)\n",
-           locfs_inode, inode->i_ino);
-    kmem_cache_free(locfs_inode_cache, locfs_inode);
-}
 
 void locfs_fill_inode(struct super_block *sb, struct inode *inode,
                         struct locfs_inode *locfs_inode) {
