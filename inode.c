@@ -220,8 +220,7 @@ int locfs_create_inode(struct inode *dir, struct dentry *dentry,
 
     inode_init_owner(inode, dir, mode);
     d_add(dentry, inode);
-
-    /* TODO we should free newly allocated inodes when error occurs */
+    locfs_save_locfs_inode(sb, locfs_inode);
 
     return 0;
 }
@@ -311,6 +310,7 @@ int locfs_iterate(struct file *filp,
 	struct super_block *sb;
 	struct buffer_head *bh;
 	struct locfs_inode *lfs_inode;
+	struct locfs_inode *lfs_child_inode;
 	struct locfs_dir_record *record;
 	int i;
 
@@ -340,16 +340,19 @@ int locfs_iterate(struct file *filp,
 	record = (struct locfs_dir_record *)bh->b_data;
 
 	for (i = 0; i < lfs_inode->dir_children_count; i++) {
+        lfs_child_inode = locfs_get_locfs_inode(sb, record->inode_no);
+
         // Compare to see if this file was saved at the current location   
-        printk(KERN_INFO "locfs: li_gps_data == %s", lfs_inode->location);
-        if (strcmp(lfs_inode->location, curr_location) == 0) {
+        printk(KERN_INFO "lfs_inode->location=%s, record->filename=%s, record->inode_no=%llu", lfs_child_inode->location, record->filename, record->inode_no);
+        if (strcmp(lfs_child_inode->location, curr_location) == 0) {
 	        dir_emit(ctx, record->filename, LOCFS_FILENAME_MAXLEN, record->inode_no, DT_UNKNOWN);
-        	ctx->pos += sizeof(struct locfs_dir_record);
-        	pos += sizeof(struct locfs_dir_record);
-        	record++;
         } else {
             printk(KERN_INFO "File %s not in %s location", record->filename, curr_location);
         }
+
+        ctx->pos += sizeof(struct locfs_dir_record);
+        pos += sizeof(struct locfs_dir_record);
+        record++;
 	}
 	brelse(bh);
 
